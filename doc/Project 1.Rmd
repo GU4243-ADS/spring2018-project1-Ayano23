@@ -53,7 +53,8 @@ spooky$author <- as.factor(spooky$author)
 
 
 ## Bigrams
-# First thing we will try is to extract pairs of words that the authors use often and map it out.
+
+First thing we will try is to extract pairs of words that the authors use often and map it out.
 
 
 ```{r}
