@@ -29,14 +29,13 @@ library(ggridges)
 library(ggraph)
 library(igraph)
 
-source("/Users/Ayano/Documents/GitHub/spring2018-project1-Ayano23/lib")
 ```
 
 ## Read in the data
 The following code assumes that the dataset `spooky.csv` lives in a `data` folder (and that we are inside a `docs` folder).
 
 ```{r}
-spooky <- read.csv('/Users/Ayano/Documents/GitHub/spring2018-project1-Ayano23/data/spooky.csv', as.is = TRUE)
+spooky <- read.csv('../data/spooky.csv', as.is = TRUE)
 ```
 
 Let's first remind ourselves of the structure of the data.
@@ -52,61 +51,32 @@ sum(is.na(spooky))
 spooky$author <- as.factor(spooky$author)
 ```
 
-```{r}
-# Make a table with one word per row and remove `stop words` (i.e. the common words).
-spooky_wrd <- unnest_tokens(spooky, word, text)
-spooky_wrd <- anti_join(spooky_wrd, stop_words, by = "word")
-head(spooky_wrd)
-```
+
+## Bigrams
+# First thing we will try is to extract pairs of words that the authors use often and map it out.
 
 
 ```{r}
-# Words is a list of words, and freqs their frequencies
-words <- count(group_by(spooky_wrd, word))$word
-freqs <- count(group_by(spooky_wrd, word))$n
-
-head(sort(freqs, decreasing = TRUE))
-
-
-# Counts number of times each author used each word.
-author_words <- count(group_by(spooky_wrd, word, author))
-
-# Counts number of times each word was used.
-all_words    <- rename(count(group_by(spooky_wrd, word)), all = n)
-
-author_words <- left_join(author_words, all_words, by = "word")
-author_words <- arrange(author_words, desc(all))
-author_words <- ungroup(head(author_words, 81))
-  
-ggplot(author_words) +
-  geom_col(aes(reorder(word, all, FUN = min), n, fill = author)) +
-  xlab(NULL) +
-  coord_flip() +
-  facet_wrap(~ author) +
-  theme(legend.position = "none")
-```
-
-```{r}
-bigram_spooky <- spooky %>% select(author, text) %>% unnest_tokens(bigram, text, token = "ngrams", n = 2)
+#extract pairs using unnest_tokens
+bigram_spooky <- select(spooky,author, text) 
+bigram_spooky <- unnest_tokens(bigram_spooky,bigram, text, token = "ngrams", n = 2)
 sample_n(bigram_spooky, 5)
 
-bi_sep <- bigram_spooky %>%
-  separate(bigram, c("word1", "word2"), sep = " ")
+#filter out stop_words
+#seprate the bigrams, filter the words, and unite them back 
+bi_sep <- separate(bigram_spooky, bigram, c("word1", "word2"), sep = " ")
 
-bi_filt <- bi_sep %>%
-  filter(!word1 %in% stop_words$word) %>%
-  filter(!word2 %in% stop_words$word)
+bi_filt <- filter(bi_sep, !word1 %in% stop_words$word) 
+bi_filt <- filter(bi_filt, !word2 %in% stop_words$word)
 
-# for later
-bigram_counts <- bi_filt %>%
-  count(word1, word2, sort = TRUE)
+bigram_counts <- count(bi_filt, word1, word2, sort = TRUE)
 
-bigram_spooky <- bi_filt %>%
-  unite(bigram, word1, word2, sep = " ")
+bigram_spooky <- unite(bi_filt, bigram, word1, word2, sep = " ")
 
 ```
 
 ```{r, include=FALSE}
+#extract tf-idf values 
 frequency <- count(bigram_spooky, author, bigram)
 tf_idf    <- bind_tf_idf(frequency, bigram, author, n)
 head(tf_idf)
@@ -116,10 +86,11 @@ tf_idf    <- arrange(tf_idf, desc(tf_idf))
 tf_idf    <- mutate(tf_idf, bigram = factor(bigram, levels = rev(unique(bigram))))
 tf_idf <- group_by(tf_idf, author)
 
-# Grab the top thirty tf_idf scores in all the words 
+# Grab the top ten tf_idf scores in all the words 
 tf_idf_10 <- top_n(tf_idf,10,tf_idf)
 ungroup(tf_idf_10)
 
+# plot the bigrams with highest tf-idf values per author
 png("../figs/Bigram.png")
 ggplot(tf_idf_10) +
   geom_col(aes(bigram, tf_idf, fill = author)) +
@@ -130,7 +101,10 @@ ggplot(tf_idf_10) +
 dev.off()
 ```
 
+# Next, we will make a network plot for each individual author. 
+
 ```{r}
+# create a function that would produce network plot for each author
 # input parameters: author, minimum count for bigram graph
 plot_bigram_net_author <- function(name, bimin){
 
@@ -138,6 +112,7 @@ plot_bigram_net_author <- function(name, bimin){
 
   sep <- separate(filt, bigram, c("word1", "word2"), sep = " ")
   
+  #filter for stop words
   bi_filt <- filter(sep, !word1 %in% stop_words$word)
   bi_filt <- filter(bi_filt, !word2 %in% stop_words$word)
   
@@ -149,6 +124,7 @@ plot_bigram_net_author <- function(name, bimin){
 
   a <- grid::arrow(type = "closed", length = unit(.08, "inches"))
   
+  # graph the network plot
   ggraph(bigram_graph, layout = "fr") +
     geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
                  arrow = a, end_cap = circle(.07, 'inches')) +
@@ -173,40 +149,175 @@ plot_bigram_net_author("MWS",3)
 dev.off()
 ```
 
-```{r}
+## 2. Punctuation analysis
+# Authors have different writing styles. Thus we want to analyze their use of punctuations. We look at the author's use of five types of punctuation marks: commas, question marks, colons, semi-colons, and quotation marks. 
+
+```{r, include=FALSE}
+# filter text data by author and store in new vector
 EAP <- filter(spooky, author == "EAP")$text
 HPL <- filter(spooky, author == "HPL")$text
 MWS <- filter(spooky, author == "MWS")$text
 
-
-
+# count the number of each punctuation for each author and store them in a vector
 punc_EAP <- c(sum(str_count(EAP,',')),sum(str_count(EAP,'[?]')),sum(str_count(EAP,'[:]')),sum(str_count(EAP,';')),sum(str_count(EAP,'["]')))
 punc_HPL <- c(sum(str_count(HPL,',')),sum(str_count(HPL,'[?]')),sum(str_count(HPL,'[:]')),sum(str_count(HPL,';')),sum(str_count(HPL,'["]')))
 punc_MWS <- c(sum(str_count(MWS,',')),sum(str_count(MWS,'[?]')),sum(str_count(MWS,'[:]')),sum(str_count(MWS,';')),sum(str_count(MWS,'["]')))
 
+#create a dataframe
 punc_value <- c(punc_EAP, punc_HPL, punc_MWS)
 punc_type <- c("comma","questionmark","colon","semicolon","quotation","comma","questionmark","colon","semicolon","quotation","comma","questionmark","colon","semicolon","quotation")
+punc_type <- as.factor(punc_type)
 authors <- c("EAP","EAP","EAP","EAP","EAP","HPL","HPL","HPL","HPL","HPL","MWS","MWS","MWS","MWS","MWS")
-punc <- as.data.frame(cbind(punc_value, punc_type, authors))
+punc <- data.frame(punc_value, punc_type, authors)
 punc
 
+punc$punc_type <- factor(punc$punc_type, levels = punc$punc_type[order(punc$punc_value)])
 
-ggplot()+
-  geom_bar(data = punc,stat = "identity", aes(x=authors,y=punc_value, fill = punc_type))
-
-```
-question
-semi
-colon
-quotation 
-
-
-str_count(, ',')
+png("../figs/punc_bargraph.png")
+ggplot(data = punc, aes(x=authors,y=punc_value, fill = punc_type, order = -as.numeric(punc_type)))+
+  geom_bar(stat = "identity")
+dev.off()
 
 ```
 
 ```{r}
-head(spooky)
+# calculate the avergae number of each puctuation mark in a sentence
+avgpunc_EAP <- round(punc_EAP/length(EAP),2)
+avgpunc_HPL <- round(punc_HPL/length(HPL),2)
+avgpunc_MWS <- round(punc_MWS/length(MWS),2)
+```
+
+## 3. Sentiment Analysis 
+# Here, we will focus on negative sentiments. 
+
+```{r}
+# filter stopwords and drop punctuations
+spooky_wrd <- unnest_tokens(spooky, word, text)
+spooky_wrd <- anti_join(spooky_wrd, stop_words, by = "word")
+
+# using the nrc sentiment lexicon, filter only for the negative words
+nrc_neg <- filter(get_sentiments('nrc'), sentiment == "negative")
+nrc_neg
+
+# join the list of negative words with spooky-wrd
+negative <- inner_join(spooky_wrd, nrc_neg, by = "word")
+head(negative)
+count(negative, word, sort = TRUE)
+```
+
+Now we plot a frequency comparison of these "negative" words.  Namely, we show the frequencies of the overall most frequently-used negative words compared among the three authors. 
+
+```{r, include=FALSE}
+pos_words     <- count(group_by(negative, word, author))
+pos_words_all <- count(group_by(negative, word))
+
+pos_words <- left_join(pos_words, pos_words_all, by = "word")
+pos_words <- arrange(pos_words, desc(n.y))
+pos_words <- ungroup(head(pos_words, 81))
+
+
+png("../figs/negative.png")
+ggplot(pos_words) +
+  geom_col(aes(reorder(word, n.y, FUN = min), n.x, fill = author)) +
+  xlab(NULL) +
+  coord_flip() +
+  facet_wrap(~ author) +
+  theme(legend.position = "none")
+dev.off()
+```
+
+The above analysis, however, did not take into account negated negatives, such as "not good". The next analysis will allow us to compare the occurences of positive and negative words preceded by the word "not".
+
+```{r, include=FALSE}
+# filter through bigram procedure
+bi_sep <- select(spooky, author, text)
+bi_sep <- unnest_tokens(bi_sep, bigram, text, token = "ngrams", n = 2)
+bi_sep <- separate(bi_sep,bigram, c("word1", "word2"), sep = " ")
+
+# all authors
+a <- filter(bi_sep, word1 == "not")
+a <- inner_join(a, get_sentiments("afinn"), by = c(word2 = "word")) 
+a <- count(a, word1, word2, score, sort = TRUE)
+a <- ungroup(a)
+a <- mutate(a, contribution = n * score)
+a <- arrange(a, desc(abs(contribution))) 
+a <- head(a,15)
+a <- mutate(a, word2 = reorder(word2, contribution))
+
+png("../figs/a.png")
+ggplot(a, aes(word2, n * score, fill = n * score > 0)) +
+  geom_col(show.legend = FALSE) +
+  xlab("") +
+  ylab("Sentiment score * number of occurrences") +
+  coord_flip() +
+  theme(plot.title = element_text(size=11)) +
+  ggtitle("All authors - Words preceded by the term 'not'")
+dev.off()
+
+# EAP
+b <- filter(bi_sep, author == "EAP")
+b <- filter(b, word1 == "not")
+b <- inner_join(b, get_sentiments("afinn"), by = c(word2 = "word"))
+b <- count(b, word1, word2, score, sort = TRUE)
+b <- ungroup(b)
+b <- mutate(b, contribution = n * score)
+b <- arrange(b, desc(abs(contribution)))
+b <- head(b, 15)
+b <- mutate(b,word2 = reorder(word2, contribution))
+
+png("../figs/b.png")
+ggplot(b, aes(word2, n * score, fill = n * score > 0)) +
+  geom_col(show.legend = FALSE) +
+  xlab("") +
+  ylab("Sentiment score * number of occurrences") +
+  coord_flip() +
+  theme(plot.title = element_text(size=11)) +
+  ggtitle("EAP - Words preceded by the term 'not'")
+dev.off()
+
+# HPL
+c <- filter(bi_sep, author == "HPL")
+c <- filter(c, word1 == "not")
+c <- inner_join(c,get_sentiments("afinn"), by = c(word2 = "word"))
+c <- count(c, word1, word2, score, sort = TRUE)
+c <- ungroup(c)
+c <- mutate(c, contribution = n * score)
+c <- arrange(c, desc(abs(contribution)))
+c <- head(c, 15)
+c <- mutate(c, word2 = reorder(word2, contribution))
+
+png("../figs/c.png")
+ggplot(c, aes(word2, n * score, fill = n * score > 0)) +
+  geom_col(show.legend = FALSE) +
+  xlab("") +
+  ylab("Sentiment score * number of occurrences") +
+  coord_flip() +
+  theme(plot.title = element_text(size=11)) +
+  ggtitle("HPL - Words preceded by the term 'not'")
+dev.off()
+
+# MWS
+d <- filter(bi_sep, author == "MWS")
+d <- filter(d, word1 == "not")
+d <- inner_join(d, get_sentiments("afinn"), by = c(word2 = "word"))
+d <- count(d, word1, word2, score, sort = TRUE)
+d <- ungroup(d)
+d <- mutate(d, contribution = n * score)
+d <- arrange(d, desc(abs(contribution)))
+d <- head(d, 15)
+d <- mutate(d, word2 = reorder(word2, contribution))
+
+png("../figs/d.png")
+ggplot(d, aes(word2, n * score, fill = n * score > 0)) +
+  geom_col(show.legend = FALSE) +
+  xlab("") +
+  ylab("Sentiment score * number of occurrences") +
+  coord_flip() +
+  theme(plot.title = element_text(size=11)) +
+  ggtitle("MWS - Words preceded by the term 'not'")
+dev.off()
 
 ```
+
+
 
