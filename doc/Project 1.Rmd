@@ -1,5 +1,5 @@
 ---
-title: "notes"
+title: "SPOOKY text analysis"
 author: "Ayano Kase"
 date: "February 4, 2018"
 output: pdf_document
@@ -51,11 +51,80 @@ sum(is.na(spooky))
 spooky$author <- as.factor(spooky$author)
 ```
 
+## Punctuation analysis
 
-## Bigrams
+Authors have different writing styles. Thus we want to analyze their use of punctuations. We look at the author's use of five types of punctuation marks: commas, question marks, colons, semi-colons, and quotation marks. 
 
-First thing we will try is to extract pairs of words that the authors use often and map it out.
+```{r, include=FALSE}
+# filter text data by author and store in new vector
+EAP <- filter(spooky, author == "EAP")$text
+HPL <- filter(spooky, author == "HPL")$text
+MWS <- filter(spooky, author == "MWS")$text
 
+# count the number of each punctuation for each author and store them in a vector
+punc_EAP <- c(sum(str_count(EAP,',')),sum(str_count(EAP,'[?]')),sum(str_count(EAP,'[:]')),sum(str_count(EAP,';')),sum(str_count(EAP,'["]')))
+punc_HPL <- c(sum(str_count(HPL,',')),sum(str_count(HPL,'[?]')),sum(str_count(HPL,'[:]')),sum(str_count(HPL,';')),sum(str_count(HPL,'["]')))
+punc_MWS <- c(sum(str_count(MWS,',')),sum(str_count(MWS,'[?]')),sum(str_count(MWS,'[:]')),sum(str_count(MWS,';')),sum(str_count(MWS,'["]')))
+
+#create a dataframe
+punc_value <- c(punc_EAP, punc_HPL, punc_MWS)
+punc_type <- c("comma","questionmark","colon","semicolon","quotation","comma","questionmark","colon","semicolon","quotation","comma","questionmark","colon","semicolon","quotation")
+punc_type <- as.factor(punc_type)
+authors <- c("EAP","EAP","EAP","EAP","EAP","HPL","HPL","HPL","HPL","HPL","MWS","MWS","MWS","MWS","MWS")
+punc <- data.frame(punc_value, punc_type, authors)
+punc
+
+punc$punc_type <- factor(punc$punc_type, levels = punc$punc_type[order(punc$punc_value)])
+
+png("../figs/punc_bargraph.png")
+ggplot(data = punc, aes(x=authors,y=punc_value, fill = punc_type, order = -as.numeric(punc_type)))+
+  geom_bar(stat = "identity")
+dev.off()
+
+```
+
+```{r}
+# calculate the avergae number of each puctuation mark in a sentence
+avgpunc_EAP <- round(punc_EAP/length(EAP),2)
+avgpunc_HPL <- round(punc_HPL/length(HPL),2)
+avgpunc_MWS <- round(punc_MWS/length(MWS),2)
+```
+
+## Word frequency 
+
+Next, we will try to look at word frequency. We'll use tf-idf as an index to indicate how frequently a certain author uses a word relative to the frequency that all the authors use the word. 
+
+```{r, include=FALSE}
+# first thing first, clean the data
+# filter stopwords and drop punctuations
+spooky_wrd <- unnest_tokens(spooky, word, text)
+spooky_wrd <- anti_join(spooky_wrd, stop_words, by = "word")
+
+# count frequency
+# calculate and bind the term frequency and inverse document frequency of a tidy text dataset
+frequency <- count(spooky_wrd, author, word)
+tf_idf    <- bind_tf_idf(frequency, word, author, n)
+head(tf_idf)
+tail(tf_idf)
+
+tf_idf    <- arrange(tf_idf, desc(tf_idf))
+tf_idf    <- mutate(tf_idf, word = factor(word, levels = rev(unique(word))))
+
+# Grab the top twenty tf_idf scores in all the words for each author
+tf_idf <- ungroup(top_n(group_by(tf_idf, author), 15, tf_idf))
+
+png("../figs/basic_tfidf.png")
+ggplot(tf_idf) +
+  geom_col(aes(word, tf_idf, fill = author)) +
+  labs(x = NULL, y = "tf-idf") +
+  theme(legend.position = "none") +
+  facet_wrap(~ author, ncol = 3, scales = "free") +
+  coord_flip() +
+  labs(y = "TF-IDF values")
+dev.off()
+```
+
+We wil extend this analysis a bit further. Next, let's look at the frequency of pairs of words and map it out. 
 
 ```{r}
 #extract pairs using unnest_tokens
@@ -137,6 +206,7 @@ plot_bigram_net_author <- function(name, bimin){
 ```
 
 ```{r, include=FALSE}
+# produce network plots for each author
 png("../figs/network_EAP.png")
 plot_bigram_net_author("EAP",4)
 dev.off()
@@ -150,55 +220,11 @@ plot_bigram_net_author("MWS",3)
 dev.off()
 ```
 
-
-## Punctuation analysis
-
-Authors have different writing styles. Thus we want to analyze their use of punctuations. We look at the author's use of five types of punctuation marks: commas, question marks, colons, semi-colons, and quotation marks. 
-
-```{r, include=FALSE}
-# filter text data by author and store in new vector
-EAP <- filter(spooky, author == "EAP")$text
-HPL <- filter(spooky, author == "HPL")$text
-MWS <- filter(spooky, author == "MWS")$text
-
-# count the number of each punctuation for each author and store them in a vector
-punc_EAP <- c(sum(str_count(EAP,',')),sum(str_count(EAP,'[?]')),sum(str_count(EAP,'[:]')),sum(str_count(EAP,';')),sum(str_count(EAP,'["]')))
-punc_HPL <- c(sum(str_count(HPL,',')),sum(str_count(HPL,'[?]')),sum(str_count(HPL,'[:]')),sum(str_count(HPL,';')),sum(str_count(HPL,'["]')))
-punc_MWS <- c(sum(str_count(MWS,',')),sum(str_count(MWS,'[?]')),sum(str_count(MWS,'[:]')),sum(str_count(MWS,';')),sum(str_count(MWS,'["]')))
-
-#create a dataframe
-punc_value <- c(punc_EAP, punc_HPL, punc_MWS)
-punc_type <- c("comma","questionmark","colon","semicolon","quotation","comma","questionmark","colon","semicolon","quotation","comma","questionmark","colon","semicolon","quotation")
-punc_type <- as.factor(punc_type)
-authors <- c("EAP","EAP","EAP","EAP","EAP","HPL","HPL","HPL","HPL","HPL","MWS","MWS","MWS","MWS","MWS")
-punc <- data.frame(punc_value, punc_type, authors)
-punc
-
-punc$punc_type <- factor(punc$punc_type, levels = punc$punc_type[order(punc$punc_value)])
-
-png("../figs/punc_bargraph.png")
-ggplot(data = punc, aes(x=authors,y=punc_value, fill = punc_type, order = -as.numeric(punc_type)))+
-  geom_bar(stat = "identity")
-dev.off()
-
-```
-
-```{r}
-# calculate the avergae number of each puctuation mark in a sentence
-avgpunc_EAP <- round(punc_EAP/length(EAP),2)
-avgpunc_HPL <- round(punc_HPL/length(HPL),2)
-avgpunc_MWS <- round(punc_MWS/length(MWS),2)
-```
-
 ## Sentiment Analysis 
 
 Here, we will focus on negative sentiments. 
 
 ```{r}
-# filter stopwords and drop punctuations
-spooky_wrd <- unnest_tokens(spooky, word, text)
-spooky_wrd <- anti_join(spooky_wrd, stop_words, by = "word")
-
 # using the nrc sentiment lexicon, filter only for the negative words
 nrc_neg <- filter(get_sentiments('nrc'), sentiment == "negative")
 nrc_neg
@@ -209,20 +235,20 @@ head(negative)
 count(negative, word, sort = TRUE)
 ```
 
-
 Now we plot a frequency comparison of these "negative" words.  Namely, we show the frequencies of the overall most frequently-used negative words compared among the three authors. 
 
 ```{r, include=FALSE}
-pos_words     <- count(group_by(negative, word, author))
-pos_words_all <- count(group_by(negative, word))
+#
+neg_words     <- count(group_by(negative, word, author))
+neg_words_all <- count(group_by(negative, word))
 
-pos_words <- left_join(pos_words, pos_words_all, by = "word")
-pos_words <- arrange(pos_words, desc(n.y))
-pos_words <- ungroup(head(pos_words, 81))
+neg_words <- left_join(neg_words, pos_words_all, by = "word")
+neg_words <- arrange(neg_words, desc(n.y))
+neg_words <- ungroup(head(neg_words, 81))
 
 
 png("../figs/negative.png")
-ggplot(pos_words) +
+ggplot(neg_words) +
   geom_col(aes(reorder(word, n.y, FUN = min), n.x, fill = author)) +
   xlab(NULL) +
   coord_flip() +
@@ -230,7 +256,6 @@ ggplot(pos_words) +
   theme(legend.position = "none")
 dev.off()
 ```
-
 
 The above analysis, however, did not take into account negated negatives, such as "not good". The next analysis will allow us to compare the occurences of positive and negative words preceded by the word "not".
 

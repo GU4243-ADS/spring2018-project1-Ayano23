@@ -1,5 +1,5 @@
 # Spring2018
-# Project 1:
+# Project 1: SPOOKY text analysis
 
 ----
 
@@ -10,10 +10,17 @@ Term: Spring 2018
 
 + Project title: An R Notebook Data Story on Horror Stories
 + This project is conducted by Ayano Kase, UNI: ak3687
-+ Project summary: This project conducts a textual analysis of three writers, Edgar Allen Poe, HP Lovecraft, and Mary Shelly in order to gain insight into their writing styles. Specifically, I conducted analysis on their word pair frequency, punctuation styles, and negative sentiments. 
++ Project summary: This project conducts a textual analysis of three writers, Edgar Allen Poe, HP Lovecraft, and Mary Shelly in order to gain insight into their writing styles. Specifically, I conducted analysis on their punctuation styles, word frequency (basic, bigram), and negative sentiments. 
 
 ### What kinds of words do each author use?
-The way authors pair certain words can be an indicator of uniqueness in writing characteristics. In order to measure frequency of a pair of words, I used tf-idf, which is an index to to indicate how frequently a certain author uses a pair of words relative to the frequency of all the other authors. The below graph presents the top 10 frequent pairs for each author. 
+
+Looking at word frequencies are a good way to spotting unique characteristics of each author's text. In order to measure frequency, I used tf-idf, which is an index to indicate how frequently a certian author uses a word relative to the frequency of all the other authors. The below graph presents the top 15 frequent words for each author. 
+
+![](figs/basic_tfidf.png)
+
+We can see that the words listed are mostly character names. Now,  we want to take this analysis one step further to gain better insight into the writing chracteristics of each author. Instead of looking at single words, the following analysis extracts frequencies of pairs of words by utilizign the bigram method and similarly tf-idf. 
+
+The below graph presents the top 10 frequent pairs for each author. 
 
 ![](figs/Bigram.png)
 
