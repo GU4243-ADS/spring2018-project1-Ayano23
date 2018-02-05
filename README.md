@@ -15,7 +15,7 @@ Term: Spring 2018
 ### What kinds of words do each author use?
 The way authors pair certain words can be an indicator of uniqueness in writing characteristics. In order to measure frequency of a pair of words, I used tf-idf, which is an index to to indicate how frequently a certain author uses a pair of words relative to the frequency of all the other authors. The below graph presents the top 10 frequent pairs for each author. 
 
-![picture](../figs/Bigram.png)
+![](figs/Bigram.png)
 
 From the above graph, we can observe the following:
 
@@ -27,15 +27,15 @@ From the above graph, we can observe the following:
 
 Network plots can help us to visualize better the relationship between the words. 
 
-![picture](../figs/network_EAP.png)
+![](figs/network_EAP.png)
 
 + In addition to the above observations, EAP tends to repeat the same words a lot (ex. Ha ha, ugh ugh, hu hu)
 
-![picture](../figs/network_HPL.png)
+![](figs/network_HPL.png)
 
 + "Dr. Armitage", "Dr. Halsey" and "Dr. Johnson" are obvious tips for identifying HPL's writing
 
-![picture](../figs/network_MWS.png)
+![](figs/network_MWS.png)
 
 + Seems to lack in terms of inventive words as compared to the other two authors
 
@@ -44,7 +44,7 @@ As we can see from the above observations, extracting words in pairs rather than
 ### How does each author create a sentence?
 While there are many ways to analyze a sentence structure, one way of understanding them is through punctuations. Here, I analyzed the frequency of five different types of punctuation marks for each author. 
 
-![picture](../figs/punc_bargraph.png)
+![](figs/punc_bargraph.png)
 
 The graph points us to interesting observations:
 
@@ -60,7 +60,7 @@ The last type of analysis is a sentiment analysis. There is a specific lexicon t
 
 Below is a graph of frequency comparison of negative words. 
 
-![picture](../figs/negative.png)
+![](figs/negative.png)
 
 While they all use a fair amount of negative words in total, there are variations in word choices that are interesting to take a look at. For example, 
 + EAP uses the words "doubt", "fell", "immediately" a lot more frequently than the other two
@@ -69,10 +69,10 @@ While they all use a fair amount of negative words in total, there are variation
 
 In order to delve a little further into this analysis, I also looked at negated negatives, which are words like "not good" that won't be picked up by the previous sentiment analysis. The four graphs plot the [sentiment score*number of occurrences] for words preceded by the term "not" for all authors and individual authors. 
 
-![picture](../figs/a.png)
-![picture](../figs/d.png)
-![picture](../figs/b.png)
-![picture](../figs/c.png)
+![](figs/a.png)
+![](figs/b.png)
+![](figs/c.png)
+![](figs/d.png)
 
 Here, we can clearly see that HPL is the most negative out of the three authors for his abundant uses of word pairs like "not like". 
 
