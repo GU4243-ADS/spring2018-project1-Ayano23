@@ -49,7 +49,7 @@ Network plots can help us to visualize better the relationship between the words
 As we can see from the above observations, extracting words in pairs rather than one is an effective way to capture the unique characteristics of the author's writing, because 1) it helps us capture fixed nouns that are an easy tool to identify authors, and 2) observe quirks in writing such as repetition and made-up words. 
 
 ### How does each author create a sentence?
-While there are many ways to analyze a sentence structure, one way of understanding them is through punctuations. Here, I analyzed the frequency of five different types of punctuation marks for each author. 
+While there are many ways to analyze sentence structures, one way of understanding them is through punctuations. Here, I analyzed the frequency of five different types of punctuation marks for each author. 
 
 ![](figs/punc_bargraph.png)
 
