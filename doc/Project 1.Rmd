@@ -2,7 +2,9 @@
 title: "SPOOKY text analysis"
 author: "Ayano Kase"
 date: "February 4, 2018"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ## Setup the libraries
@@ -55,7 +57,7 @@ spooky$author <- as.factor(spooky$author)
 
 Authors have different writing styles. Thus we want to analyze their use of punctuations. We look at the author's use of five types of punctuation marks: commas, question marks, colons, semi-colons, and quotation marks. 
 
-```{r, include=FALSE}
+```{r}
 # filter text data by author and store in new vector
 EAP <- filter(spooky, author == "EAP")$text
 HPL <- filter(spooky, author == "HPL")$text
@@ -94,7 +96,7 @@ avgpunc_MWS <- round(punc_MWS/length(MWS),2)
 
 Next, we will try to look at word frequency. We'll use tf-idf as an index to indicate how frequently a certain author uses a word relative to the frequency that all the authors use the word. 
 
-```{r, include=FALSE}
+```{r}
 # first thing first, clean the data
 # filter stopwords and drop punctuations
 spooky_wrd <- unnest_tokens(spooky, word, text)
@@ -110,7 +112,7 @@ tail(tf_idf)
 tf_idf    <- arrange(tf_idf, desc(tf_idf))
 tf_idf    <- mutate(tf_idf, word = factor(word, levels = rev(unique(word))))
 
-# Grab the top twenty tf_idf scores in all the words for each author
+# grab the top twenty tf_idf scores in all the words for each author
 tf_idf <- ungroup(top_n(group_by(tf_idf, author), 15, tf_idf))
 
 png("../figs/basic_tfidf.png")
@@ -145,7 +147,7 @@ bigram_spooky <- unite(bi_filt, bigram, word1, word2, sep = " ")
 
 ```
 
-```{r, include=FALSE}
+```{r}
 #extract tf-idf values 
 frequency <- count(bigram_spooky, author, bigram)
 tf_idf    <- bind_tf_idf(frequency, bigram, author, n)
@@ -182,7 +184,7 @@ plot_bigram_net_author <- function(name, bimin){
 
   sep <- separate(filt, bigram, c("word1", "word2"), sep = " ")
   
-  #filter for stop words
+  # filter for stop words
   bi_filt <- filter(sep, !word1 %in% stop_words$word)
   bi_filt <- filter(bi_filt, !word2 %in% stop_words$word)
   
@@ -205,7 +207,7 @@ plot_bigram_net_author <- function(name, bimin){
 
 ```
 
-```{r, include=FALSE}
+```{r}
 # produce network plots for each author
 png("../figs/network_EAP.png")
 plot_bigram_net_author("EAP",4)
@@ -237,12 +239,11 @@ count(negative, word, sort = TRUE)
 
 Now we plot a frequency comparison of these "negative" words.  Namely, we show the frequencies of the overall most frequently-used negative words compared among the three authors. 
 
-```{r, include=FALSE}
-#
+```{r}
 neg_words     <- count(group_by(negative, word, author))
 neg_words_all <- count(group_by(negative, word))
 
-neg_words <- left_join(neg_words, pos_words_all, by = "word")
+neg_words <- left_join(neg_words, neg_words_all, by = "word")
 neg_words <- arrange(neg_words, desc(n.y))
 neg_words <- ungroup(head(neg_words, 81))
 
@@ -259,7 +260,7 @@ dev.off()
 
 The above analysis, however, did not take into account negated negatives, such as "not good". The next analysis will allow us to compare the occurences of positive and negative words preceded by the word "not".
 
-```{r, include=FALSE}
+```{r}
 # filter through bigram procedure
 bi_sep <- select(spooky, author, text)
 bi_sep <- unnest_tokens(bi_sep, bigram, text, token = "ngrams", n = 2)
