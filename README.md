@@ -3,7 +3,6 @@
 
 ----
 
-
 ### Project Description
 This is the first and only *individual* (as opposed to *team*) this semester. 
 
