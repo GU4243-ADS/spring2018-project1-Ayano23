@@ -1,0 +1,212 @@
+---
+title: "notes"
+author: "Ayano Kase"
+date: "February 4, 2018"
+output: pdf_document
+---
+
+## Setup the libraries
+First we want to install and load libraries we need along the way.  Note that the following code is completely reproducible -- you don't need to add any code on your own to make it run.
+
+```{r, message = F, warning = F}
+packages.used <- c("ggplot2", "dplyr", "tibble", "tidyr",  "stringr", "tidytext", "topicmodels", "wordcloud", "ggridges","ggraph","igraph")
+
+# check packages that need to be installed.
+packages.needed <- setdiff(packages.used, intersect(installed.packages()[,1], packages.used))
+
+# install additional packages
+if(length(packages.needed) > 0) {
+  install.packages(packages.needed, dependencies = TRUE, repos = 'http://cran.us.r-project.org')
+}
+
+library(ggplot2)
+library(dplyr)
+library(tibble)
+library(tidyr)
+library(stringr)
+library(tidytext)
+library(ggridges)
+library(ggraph)
+library(igraph)
+
+source("/Users/Ayano/Documents/GitHub/spring2018-project1-Ayano23/lib")
+```
+
+## Read in the data
+The following code assumes that the dataset `spooky.csv` lives in a `data` folder (and that we are inside a `docs` folder).
+
+```{r}
+spooky <- read.csv('/Users/Ayano/Documents/GitHub/spring2018-project1-Ayano23/data/spooky.csv', as.is = TRUE)
+```
+
+Let's first remind ourselves of the structure of the data.
+```{r}
+head(spooky)
+summary(spooky)
+```
+
+We see from the above that each row of our data contains a unique ID, a single sentence text excerpt, and an abbreviated author name. `HPL` is Lovecraft, `MWS` is Shelly, and `EAP` is Poe.  We finally note that there are no missing values, and we change author name to be a factor variable, which will help us later on.
+
+```{r}
+sum(is.na(spooky))
+spooky$author <- as.factor(spooky$author)
+```
+
+```{r}
+# Make a table with one word per row and remove `stop words` (i.e. the common words).
+spooky_wrd <- unnest_tokens(spooky, word, text)
+spooky_wrd <- anti_join(spooky_wrd, stop_words, by = "word")
+head(spooky_wrd)
+```
+
+
+```{r}
+# Words is a list of words, and freqs their frequencies
+words <- count(group_by(spooky_wrd, word))$word
+freqs <- count(group_by(spooky_wrd, word))$n
+
+head(sort(freqs, decreasing = TRUE))
+
+
+# Counts number of times each author used each word.
+author_words <- count(group_by(spooky_wrd, word, author))
+
+# Counts number of times each word was used.
+all_words    <- rename(count(group_by(spooky_wrd, word)), all = n)
+
+author_words <- left_join(author_words, all_words, by = "word")
+author_words <- arrange(author_words, desc(all))
+author_words <- ungroup(head(author_words, 81))
+  
+ggplot(author_words) +
+  geom_col(aes(reorder(word, all, FUN = min), n, fill = author)) +
+  xlab(NULL) +
+  coord_flip() +
+  facet_wrap(~ author) +
+  theme(legend.position = "none")
+```
+
+```{r}
+bigram_spooky <- spooky %>% select(author, text) %>% unnest_tokens(bigram, text, token = "ngrams", n = 2)
+sample_n(bigram_spooky, 5)
+
+bi_sep <- bigram_spooky %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+bi_filt <- bi_sep %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+
+# for later
+bigram_counts <- bi_filt %>%
+  count(word1, word2, sort = TRUE)
+
+bigram_spooky <- bi_filt %>%
+  unite(bigram, word1, word2, sep = " ")
+
+```
+
+```{r, include=FALSE}
+frequency <- count(bigram_spooky, author, bigram)
+tf_idf    <- bind_tf_idf(frequency, bigram, author, n)
+head(tf_idf)
+tail(tf_idf)
+tf_idf    <- arrange(tf_idf, desc(tf_idf))
+
+tf_idf    <- mutate(tf_idf, bigram = factor(bigram, levels = rev(unique(bigram))))
+tf_idf <- group_by(tf_idf, author)
+
+# Grab the top thirty tf_idf scores in all the words 
+tf_idf_10 <- top_n(tf_idf,10,tf_idf)
+ungroup(tf_idf_10)
+
+png("../figs/Bigram.png")
+ggplot(tf_idf_10) +
+  geom_col(aes(bigram, tf_idf, fill = author)) +
+  labs(x = NULL, y = "TF-IDF values") +
+  theme(legend.position = "top", axis.text.x  = element_text(angle=45, hjust=1, vjust=0.9))+
+  facet_wrap(~ author, ncol = 3, scales = "free") +
+  coord_flip()
+dev.off()
+```
+
+```{r}
+# input parameters: author, minimum count for bigram graph
+plot_bigram_net_author <- function(name, bimin){
+
+  filt <- filter(bigram_spooky, author == name)
+
+  sep <- separate(filt, bigram, c("word1", "word2"), sep = " ")
+  
+  bi_filt <- filter(sep, !word1 %in% stop_words$word)
+  bi_filt <- filter(bi_filt, !word2 %in% stop_words$word)
+  
+  bigram_graph <- count(bi_filt, word1, word2, sort = TRUE) 
+  bigram_graph <- filter(bigram_graph, n > bimin)
+  bigram_graph <- graph_from_data_frame(bigram_graph)
+  
+  set.seed(1234)
+
+  a <- grid::arrow(type = "closed", length = unit(.08, "inches"))
+  
+  ggraph(bigram_graph, layout = "fr") +
+    geom_edge_link(aes(edge_alpha = n), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+    geom_node_point(color = "pink", size = 2) +
+    geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+    theme_void()
+}
+
+```
+
+```{r, include=FALSE}
+png("../figs/network_EAP.png")
+plot_bigram_net_author("EAP",4)
+dev.off()
+
+png("../figs/network_HPL.png")
+plot_bigram_net_author("HPL",4)
+dev.off()
+
+png("../figs/network_MWS.png")
+plot_bigram_net_author("MWS",3)
+dev.off()
+```
+
+```{r}
+EAP <- filter(spooky, author == "EAP")$text
+HPL <- filter(spooky, author == "HPL")$text
+MWS <- filter(spooky, author == "MWS")$text
+
+
+
+punc_EAP <- c(sum(str_count(EAP,',')),sum(str_count(EAP,'[?]')),sum(str_count(EAP,'[:]')),sum(str_count(EAP,';')),sum(str_count(EAP,'["]')))
+punc_HPL <- c(sum(str_count(HPL,',')),sum(str_count(HPL,'[?]')),sum(str_count(HPL,'[:]')),sum(str_count(HPL,';')),sum(str_count(HPL,'["]')))
+punc_MWS <- c(sum(str_count(MWS,',')),sum(str_count(MWS,'[?]')),sum(str_count(MWS,'[:]')),sum(str_count(MWS,';')),sum(str_count(MWS,'["]')))
+
+punc_value <- c(punc_EAP, punc_HPL, punc_MWS)
+punc_type <- c("comma","questionmark","colon","semicolon","quotation","comma","questionmark","colon","semicolon","quotation","comma","questionmark","colon","semicolon","quotation")
+authors <- c("EAP","EAP","EAP","EAP","EAP","HPL","HPL","HPL","HPL","HPL","MWS","MWS","MWS","MWS","MWS")
+punc <- as.data.frame(cbind(punc_value, punc_type, authors))
+punc
+
+
+ggplot()+
+  geom_bar(data = punc,stat = "identity", aes(x=authors,y=punc_value, fill = punc_type))
+
+```
+question
+semi
+colon
+quotation 
+
+
+str_count(, ',')
+
+```
+
+```{r}
+head(spooky)
+
+```
+
